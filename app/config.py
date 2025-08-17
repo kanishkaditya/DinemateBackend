@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "mongodb+srv://kanishk:gamora12@cluster0.gmynbk3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    database_url: str = ""
     database_name: str = "dinemate_db"
     
     # Foursquare API

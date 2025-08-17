@@ -29,11 +29,11 @@ async def update_preferences(
     try:
         # Convert to dict
         preferences_dict = {
-            "dietary_restrictions": preferences.dietary_restrictions,
-            "preferred_cuisines": preferences.preferred_cuisines,
-            "budget_preference": preferences.budget_preference,
-            "dining_style": preferences.dining_style,
-            "spice_tolerance": preferences.spice_tolerance,
+            "dietary_restrictions": preferences.preferences["dietary_restrictions"],
+            "preferred_cuisines": preferences.preferences["preferred_cuisines"],
+            "budget_preference": preferences.preferences["budget_preference"],
+            "dining_style": preferences.preferences["dining_style"],
+            "spice_tolerance": preferences.preferences["spice_tolerance"],
             "onboarding_completed": True
         }
         

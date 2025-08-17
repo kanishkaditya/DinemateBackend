@@ -39,3 +39,4 @@ dmypy.json
 # FastAPI specific
 .pytest_cache/
 htmlcov/
+*.env

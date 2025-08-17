@@ -41,8 +41,10 @@ class UserLoginResponse(UserBase):
 class UpdatePreferencesRequest(BaseModel):
     # 5 simple onboarding questions
     firebase_id: str
-    dietary_restrictions: list = []  # ["vegetarian", "gluten_free", etc.]
-    preferred_cuisines: list = []    # ["italian", "mexican", "chinese"]
-    budget_preference: str = "moderate"  # "budget", "moderate", "upscale" 
-    dining_style: list = []          # ["casual", "fine_dining", "quick_service"]
-    spice_tolerance: str = "medium"  # "mild", "medium", "spicy"
+    preferences: dict = {
+            "dietary_restrictions": [],  # ["vegetarian", "gluten_free", etc.]
+            "preferred_cuisines": [],    # ["italian", "mexican", "chinese"]
+            "budget_preference": "moderate",  # "budget", "moderate", "upscale" 
+            "dining_style": [],          # ["casual", "fine_dining", "quick_service"]
+            "spice_tolerance": "medium"  # "mild", "medium", "spicy"
+    }
