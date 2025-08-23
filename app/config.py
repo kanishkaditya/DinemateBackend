@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     foursquare_api_key: str
     foursquare_base_url: str = "https://api.foursquare.com/v3"
     
+    # OpenAI API
+    openai_api_key: str
+    
     # Application
     app_name: str = "DineMate"
     app_version: str = "1.0.0"

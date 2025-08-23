@@ -1,13 +1,13 @@
 from typing import List, Optional
 import random
 import string
-from models.group import Group, ChatMessage, GroupStatus, MessageType
-from models.user import User
-from schemas.group import (
+from ..models.group import Group, ChatMessage, GroupStatus, MessageType
+from ..models.user import User
+from ..schemas.group import (
     GroupCreate, GroupJoin, MessageCreate, 
     GroupResponse, GroupDetailResponse, MessageResponse, GroupMember
 )
-from services.group_preference_service import GroupPreferencesService
+from .group_preference_service import GroupPreferencesService
 
 
 class GroupService:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 from typing import Dict, Any
-from services.group_preference_service import GroupPreferencesService
-from core.exceptions import HTTPExceptions
+from ...services.group_preference_service import GroupPreferencesService
+from ...core.exceptions import HTTPExceptions
 
 router = APIRouter()
 

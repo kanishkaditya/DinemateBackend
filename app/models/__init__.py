@@ -1,9 +1,12 @@
-# Import all models to ensure they are registered with SQLAlchemy
-from models.user import User
-from models.group_preferences import GroupPreferences
+# Import all models to ensure they are registered with Beanie
+from .user import User
+from .group_preferences import GroupPreferences
+from .group import Group, ChatMessage
 
 # Export all models
 __all__ = [
     "User",
-    "GroupPreferences", 
+    "GroupPreferences",
+    "Group", 
+    "ChatMessage",
 ]

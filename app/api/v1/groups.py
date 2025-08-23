@@ -1,11 +1,11 @@
 from fastapi import APIRouter, status, Query
 from typing import List
-from schemas.group import (
+from ...schemas.group import (
     GroupCreate, GroupJoin, MessageCreate, GroupResponse, 
     GroupDetailResponse, MessageResponse, GroupListResponse
 )
-from services.group_service import GroupService
-from core.exceptions import HTTPExceptions
+from ...services.group_service import GroupService
+from ...core.exceptions import HTTPExceptions
 
 router = APIRouter()
 
@@ -60,6 +60,16 @@ async def send_message(group_id: str, message_data: MessageCreate):
     
     try:
         message = await group_service.send_message(group_id, message_data)
+        
+        # Trigger real-time message analysis
+        from background_worker.tasks.message_analysis import analyze_single_message_task
+        analyze_single_message_task.delay(
+            message_id=str(message.id),
+            group_id=group_id,
+            user_id=message_data.firebase_id,
+            message_content=message_data.content
+        )
+        
         return message
     except ValueError as e:
         raise HTTPExceptions.bad_request(str(e))

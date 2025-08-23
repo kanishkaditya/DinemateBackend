@@ -1,5 +1,8 @@
 from fastapi import APIRouter
-from api.v1 import auth, groups, restaurants, group_preferences, user
+from . import (
+    auth, groups, restaurants, group_preferences, user
+)
+
 # Create main API router
 api_router = APIRouter()
 
@@ -9,7 +12,6 @@ api_router.include_router(
     prefix="/auth",
     tags=["authentication"]
 )
-
 
 api_router.include_router(
     groups.router,
@@ -23,8 +25,6 @@ api_router.include_router(
     tags=["restaurants"]
 )
 
-
-
 api_router.include_router(
     group_preferences.router,
     prefix="/group-preferences",
@@ -36,3 +36,4 @@ api_router.include_router(
     prefix="/user",
     tags=["users"]
 )
+

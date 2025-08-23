@@ -1,7 +1,7 @@
 # app/services/auth_service.py
 from typing import Optional, Dict, Any
-from models.user import User
-from schemas.user import UserCreate, UserLogin, UserLoginResponse
+from ..models.user import User
+from ..schemas.user import UserCreate, UserLogin, UserLoginResponse
 
 class AuthService:
     def __init__(self):
@@ -73,4 +73,8 @@ class AuthService:
     
     async def get_user_by_firebase_uid(self, firebase_uid: str) -> Optional[User]:
         """Get user by Firebase UID"""
-        return await User.find_one(User.firebase_uid == firebase_uid)
+        return await User.find_one(User.firebase_id == firebase_uid)
+
+
+# Global service instance
+auth_service = AuthService()

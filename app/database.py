@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
-from config import settings
+from .config import settings
 import asyncio
 
 
@@ -21,15 +21,25 @@ async def connect_to_mongo():
     db.client = AsyncIOMotorClient(settings.database_url)
     
     # Import all models here to register them with Beanie
-    from models.user import User
-    from models.group_preferences import GroupPreferences
-    from models.group import Group, ChatMessage
+    from .models.user import User
+    from .models.group_preferences import GroupPreferences
+    from .models.group import Group, ChatMessage
+    from .models.restaurant import (
+        Restaurant, RestaurantLocation, RestaurantCategory, 
+        RestaurantHours, RestaurantPhoto, RestaurantReview,
+        RestaurantStats, RestaurantSearchCache
+    )
 
     
     # Initialize Beanie with the models
     await init_beanie(
         database=db.client[settings.database_name],
-        document_models=[User, GroupPreferences, Group, ChatMessage]
+        document_models=[
+            User, GroupPreferences, Group, ChatMessage,
+            Restaurant, RestaurantLocation, RestaurantCategory,
+            RestaurantHours, RestaurantPhoto, RestaurantReview,
+            RestaurantStats, RestaurantSearchCache
+        ]
     )
 
 

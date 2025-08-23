@@ -1,14 +1,13 @@
 from fastapi import APIRouter, status
-from schemas.user import (
+from ...schemas.user import (
     UserCreate, 
     UserLogin, 
     UserLoginResponse,
-    UpdatePreferencesRequest
-    
+    UpdatePreferencesRequest,
+    UserResponse
 )
-from schemas.user import UserResponse
-from services.auth_service import AuthService
-from core.exceptions import HTTPExceptions
+from ...services.auth_service import AuthService
+from ...core.exceptions import HTTPExceptions
 
 # Create router
 router = APIRouter()
@@ -43,7 +42,7 @@ async def login(request: UserLogin):
     except Exception as e:
         raise HTTPExceptions.internal_server_error("Login failed")
 
-@router.get("/user/{firebase_uid}", response_model=UserLoginResponse)
+@router.get("/{firebase_uid}", response_model=UserLoginResponse)
 async def get_user_by_firebase_id(firebase_uid: str):
 
     auth_service = AuthService()

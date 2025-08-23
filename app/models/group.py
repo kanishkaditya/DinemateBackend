@@ -47,6 +47,9 @@ class Group(Document):
     selected_restaurant: Optional[dict] = None
     decision_made_at: Optional[datetime] = None
     
+    aggregated_recommendation_keywords: List[str] = Field(default_factory=list)
+    last_keywords_update: Optional[datetime] = None
+    
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     

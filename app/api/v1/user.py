@@ -1,14 +1,14 @@
 from fastapi import APIRouter
 from typing import List
-from schemas.user import (
+from ...schemas.user import (
     UpdatePreferencesRequest
     
 )
-from schemas.user import UserLoginResponse
-from schemas.group import GroupResponse, GroupListResponse
-from services.user_service import UserService
-from services.group_service import GroupService
-from core.exceptions import HTTPExceptions
+from ...schemas.user import UserLoginResponse
+from ...schemas.group import GroupResponse, GroupListResponse
+from ...services.user_service import UserService
+from ...services.group_service import GroupService
+from ...core.exceptions import HTTPExceptions
 
 # Create router
 router = APIRouter()
@@ -34,8 +34,9 @@ async def update_preferences(
             "budget_preference": preferences.budget_preference,
             "dining_style": preferences.dining_style,
             "spice_tolerance": preferences.spice_tolerance,
-            "onboarding_completed": True
         }
+
+        print(preferences_dict)
         
         user = await user_service.update_user_preferences(preferences.firebase_id, preferences_dict)
         return user

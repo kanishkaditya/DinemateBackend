@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from config import settings
-from api.v1.router import api_router
-from database import startup_db_client, shutdown_db_client
+from .config import settings
+from .api.v1.router import api_router
+from .database import startup_db_client, shutdown_db_client
 
 
 @asynccontextmanager
