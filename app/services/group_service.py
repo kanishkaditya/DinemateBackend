@@ -47,9 +47,9 @@ class GroupService:
                     # Different error, re-raise
                     raise
         
-        # Auto-create group preferences for the creator
+        # Create group preferences with creator's preferences
         preference_service = GroupPreferencesService()
-        await preference_service.create_default_group_preferences(str(group.id), user.firebase_id)
+        await preference_service.create_or_update_group_preferences(str(group.id), user.firebase_id)
         
         await self._add_system_message(str(group.id), f"{user.username} created the group")
         
@@ -73,9 +73,9 @@ class GroupService:
         group.member_ids.append(user.firebase_id)
         await group.save()
         
-        # Auto-create group preferences for the new member
+        # Add new member's preferences to group preferences
         preference_service = GroupPreferencesService()
-        await preference_service.create_default_group_preferences(str(group.id), user.firebase_id)
+        await preference_service.create_or_update_group_preferences(str(group.id), user.firebase_id)
         
         await self._add_system_message(str(group.id), f"{user.username} joined the group")
         
@@ -177,7 +177,17 @@ class GroupService:
         
         group.member_ids.remove(user.firebase_id)
         
+        # Remove member's preferences from group preferences
+        preference_service = GroupPreferencesService()
+        group_prefs = await preference_service.get_group_preferences(group_id)
+        if group_prefs:
+            group_prefs.remove_member_preferences(user.firebase_id)
+            await group_prefs.save()
+        
         if len(group.member_ids) == 0:
+            # Delete group and its preferences
+            if group_prefs:
+                await group_prefs.delete()
             await group.delete()
         else:
             await group.save()

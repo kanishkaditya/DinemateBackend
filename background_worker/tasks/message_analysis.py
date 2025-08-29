@@ -232,38 +232,40 @@ async def _analyze_group_preferences_async(task, group_id: str):
 
 
 async def _update_user_preferences_from_analysis(group_id: str, user_id: str, analysis_result: Dict[str, Any]):
-    """Update user's group preferences based on analysis results using new generic keyword structure."""
+    """Update user's group preferences based on analysis results using Foursquare parameters."""
     try:
-        from app.services.group_preference_service import group_preference_service
+        from app.models.group_preferences import GroupPreferences
         
-        extracted_keywords = analysis_result.get("extracted_keywords", {})
-        recommendation_keywords = analysis_result.get("recommendation_keywords", [])
         confidence = analysis_result.get("confidence_scores", {}).get("overall_relevance", 0.7)
+        api_ready = analysis_result.get("api_ready", False)
         
-        has_keywords = any(keywords for keywords in extracted_keywords.values() if isinstance(keywords, list) and keywords)
+        # Minimum confidence threshold for updates
+        MIN_CONFIDENCE_THRESHOLD = 0.4
         
-        from shared.config import llm_config
-        if has_keywords and confidence > llm_config.MIN_CONFIDENCE_THRESHOLD:
-            await group_preference_service.update_preferences_from_llm(
-                group_id=group_id,
-                user_firebase_id=user_id,
-                extracted_keywords=extracted_keywords,
-                recommendation_keywords=recommendation_keywords,
-                confidence=confidence
-            )
-            logger.info(f"Updated keyword preferences for user {user_id} (confidence: {confidence:.2f})")
+        if api_ready and confidence > MIN_CONFIDENCE_THRESHOLD:
+            # Get the single group preferences document
+            group_prefs = await GroupPreferences.find_one(GroupPreferences.group_id == group_id)
             
-        elif analysis_result.get("preferences") and confidence > llm_config.MIN_CONFIDENCE_THRESHOLD:
-            preferences = analysis_result.get("preferences", {})
-            await group_preference_service._update_from_llm(
-                await group_preference_service.create_default_group_preferences(group_id, user_id),
-                preferences,
-                confidence
-            )
-            logger.info(f"Updated legacy preferences for user {user_id}")
+            if not group_prefs:
+                # This shouldn't happen if group was created properly, but handle gracefully
+                logger.warning(f"No group preferences found for group {group_id}, creating new one")
+                group_prefs = GroupPreferences(
+                    group_id=group_id,
+                    last_updated_by="message_analysis_fallback"
+                )
+            
+            # Update group preferences from this user's message
+            group_prefs.update_from_llm_message(user_id, analysis_result)
+            
+            await group_prefs.save()
+            
+            logger.info(f"Updated group preferences from user {user_id} message in group {group_id} (confidence: {confidence:.2f}, params: {len(analysis_result.get('foursquare_parameters', {}))})")
+            
+        else:
+            logger.info(f"No actionable preferences extracted for user {user_id} (confidence: {confidence:.2f}, api_ready: {api_ready})")
             
     except Exception as e:
-        logger.error(f"Error updating preferences: {str(e)}")
+        logger.error(f"Error updating preferences for user {user_id}: {str(e)}")
         # Don't re-raise - this is a non-critical operation
 
 

@@ -173,11 +173,11 @@ class DinemateStartup:
         
         time.sleep(2)  # Wait for API to start
         
-        # if not self.start_celery_worker():
-            # success = False
+        if not self.start_celery_worker():
+            success = False
         
-        # if not self.start_celery_beat():
-            # success = False
+        if not self.start_celery_beat():
+            success = False
         
         if not success:
             print("❌ Some services failed to start")

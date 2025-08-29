@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     
     # Foursquare API
     foursquare_api_key: str
-    foursquare_base_url: str = "https://api.foursquare.com/v3"
+    foursquare_base_url: str = "https://places-api.foursquare.com"
     
     # OpenAI API
     openai_api_key: str

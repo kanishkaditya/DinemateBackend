@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from ..models.user import User
 from ..models.group_preferences import GroupPreferences
@@ -8,34 +8,33 @@ class GroupPreferencesService:
     def __init__(self):
         pass
     
-    async def create_default_group_preferences(self, group_id: str, user_firebase_id: str) -> GroupPreferences:
+    async def create_or_update_group_preferences(self, group_id: str, user_firebase_id: str) -> GroupPreferences:
         """
-        Create group preferences for a user when they join a group
-        Uses their default preferences as starting point
+        Create group preferences (if first member) or update existing with new member's preferences
         """
         user = await User.find_one(User.firebase_id == user_firebase_id)
         if not user:
             raise ValueError("User not found")
         
-        # Check if preferences already exist
-        existing = await GroupPreferences.find_one(
-            GroupPreferences.group_id == group_id,
-            GroupPreferences.firebase_uid == user_firebase_id
-        )
-        if existing:
-            return existing
+        # Get existing group preferences (one per group)
+        group_prefs = await GroupPreferences.find_one(GroupPreferences.group_id == group_id)
         
-        # Create new group preferences with user's defaults
-        group_prefs = GroupPreferences(
-            group_id=group_id,
-            user_id=str(user.id),
-            firebase_uid=user.firebase_id,
-            preferences=user.preferences.copy(),  # Start with user defaults
-            last_updated_by="user"
-        )
+        if not group_prefs:
+            # First member - create new group preferences
+            group_prefs = GroupPreferences(
+                group_id=group_id,
+                last_updated_by="group_creation"
+            )
+        
+        # Add this member's preferences to the group
+        group_prefs.add_member_preferences(user_firebase_id, user.preferences or {})
         
         await group_prefs.save()
         return group_prefs
+    
+    async def get_group_preferences(self, group_id: str) -> Optional[GroupPreferences]:
+        """Get the group preferences document for a group."""
+        return await GroupPreferences.find_one(GroupPreferences.group_id == group_id)
     
     async def update_preferences_from_llm(
         self,
@@ -374,6 +373,101 @@ class GroupPreferencesService:
         
         if group_prefs:
             await self._increment_interaction(group_prefs)
+    
+    async def _initialize_foursquare_preferences_from_user(self, group_prefs: GroupPreferences, user: User):
+        """Initialize Foursquare parameters from user's existing preferences."""
+        user_preferences = user.preferences or {}
+        
+        # Extract cuisines and map to Foursquare categories
+        preferred_cuisines = user_preferences.get("preferred_cuisines", [])
+        if preferred_cuisines:
+            # Map common cuisines to Foursquare category IDs
+            cuisine_to_category = {
+                "italian": "13236",
+                "chinese": "13099", 
+                "mexican": "13303",
+                "indian": "13199",
+                "japanese": "13263",
+                "thai": "13352",
+                "american": "13064",
+                "french": "13148",
+                "korean": "13276",
+                "mediterranean": "13305",
+                "seafood": "13338"
+            }
+            
+            for cuisine in preferred_cuisines[:3]:  # Limit to top 3
+                if cuisine.lower() in cuisine_to_category:
+                    category_id = cuisine_to_category[cuisine.lower()]
+                    if category_id not in group_prefs.extracted_categories:
+                        group_prefs.extracted_categories.append(category_id)
+                
+                # Also add as query
+                if cuisine not in group_prefs.extracted_queries:
+                    group_prefs.extracted_queries.append(cuisine)
+        
+        # Extract price preferences from budget_preference
+        budget_preference = user_preferences.get("budget_preference", "")
+        if budget_preference:
+            # Map budget preference to Foursquare price levels
+            if budget_preference == "budget":
+                group_prefs.price_preferences["min_price"] = 1
+                group_prefs.price_preferences["max_price"] = 2
+            elif budget_preference == "moderate":
+                group_prefs.price_preferences["min_price"] = 2
+                group_prefs.price_preferences["max_price"] = 3
+            elif budget_preference == "upscale":
+                group_prefs.price_preferences["min_price"] = 3
+                group_prefs.price_preferences["max_price"] = 4
+        
+        # Also handle legacy price_range format if it exists
+        price_range = user_preferences.get("price_range", {})
+        if price_range:
+            if "min" in price_range:
+                group_prefs.price_preferences["min_price"] = price_range["min"]
+            if "max" in price_range:
+                group_prefs.price_preferences["max_price"] = price_range["max"]
+        
+        # Extract dietary restrictions and add as queries
+        dietary_restrictions = user_preferences.get("dietary_restrictions", [])
+        for restriction in dietary_restrictions[:2]:  # Limit to 2
+            if restriction not in group_prefs.extracted_queries:
+                group_prefs.extracted_queries.append(restriction)
+        
+        # Extract favorite food types
+        favorite_foods = user_preferences.get("favorite_foods", [])
+        for food in favorite_foods[:2]:  # Limit to 2
+            if food not in group_prefs.extracted_queries:
+                group_prefs.extracted_queries.append(food)
+        
+        # Add spice tolerance as query
+        spice_tolerance = user_preferences.get("spice_tolerance", "")
+        if spice_tolerance and spice_tolerance != "medium":  # Only add if not default
+            spice_query = spice_tolerance if spice_tolerance != "spicy" else "spicy"
+            if spice_query not in group_prefs.extracted_queries:
+                group_prefs.extracted_queries.append(spice_query)
+        
+        # Add dining style preferences as queries
+        dining_styles = user_preferences.get("dining_style", [])
+        for style in dining_styles[:2]:  # Limit to 2
+            if style not in group_prefs.extracted_queries:
+                group_prefs.extracted_queries.append(style)
+        
+        # Set initial parameter count
+        group_prefs.foursquare_param_count = len([
+            v for v in [
+                group_prefs.extracted_queries,
+                group_prefs.extracted_categories,
+                group_prefs.price_preferences.get("min_price"),
+                group_prefs.price_preferences.get("max_price")
+            ] if v
+        ])
+        
+        # Mark as initialized from user data
+        if group_prefs.foursquare_param_count > 0:
+            group_prefs.is_llm_updated = True
+            group_prefs.last_updated_by = "user_initialization"
+            group_prefs.last_llm_update = datetime.utcnow()
 
 
 # Global service instance

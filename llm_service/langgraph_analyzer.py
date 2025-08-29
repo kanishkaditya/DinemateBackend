@@ -39,121 +39,190 @@ class MessageAnalysisState(TypedDict):
 
 
 @tool
-def preference_extractor(text: str) -> Dict[str, Any]:
-    """Extract generic food-related keywords and preferences from text using LLM-driven approach."""
-    
-    # Initialize generic keyword storage
-    extracted_keywords = {
-        "food_keywords": [],        # Any food-related terms
-        "cuisine_keywords": [],     # Cuisine types or dishes
-        "taste_keywords": [],       # Taste/flavor descriptors
-        "price_keywords": [],       # Price-related terms
-        "atmosphere_keywords": [],  # Ambiance/setting preferences
-        "dietary_keywords": [],     # Dietary needs/restrictions
-        "location_keywords": [],    # Location/proximity terms
-        "time_keywords": [],        # Time-related preferences
-        "quantity_keywords": [],    # Group size, portion mentions
-        "quality_keywords": [],     # Quality/rating descriptors
-        "service_keywords": [],     # Service expectations
-        "misc_keywords": []         # Other relevant terms
-    }
+def foursquare_parameter_extractor(text: str) -> Dict[str, Any]:
+    """Extract Foursquare API parameters from text for direct API usage."""
     
     import re
     
-    # Use regex and natural language processing to extract keywords
     text_lower = text.lower()
-    words = re.findall(r'\b\w+(?:\s+\w+)*\b', text_lower)
     
-    # Food-related indicators - cast wider net
-    food_indicators = [
-        "food", "eat", "eating", "meal", "dish", "cuisine", "restaurant", "place", 
-        "spot", "joint", "cafe", "diner", "kitchen", "grill", "bar", "bistro",
-        "lunch", "dinner", "breakfast", "brunch", "snack", "appetizer", "dessert",
-        "taste", "flavor", "delicious", "tasty", "yummy", "mouth", "hungry", "craving",
-        "cook", "cooking", "chef", "recipe", "ingredient", "sauce", "soup", "salad",
-        "meat", "chicken", "beef", "pork", "fish", "seafood", "vegetable", "fruit"
+    # Initialize Foursquare API parameters
+    foursquare_params = {
+        "query": None,           # Search query string
+        "fsq_category_ids": [],  # Foursquare category IDs
+        "min_price": None,       # 1-4 price range
+        "max_price": None,       # 1-4 price range
+        "open_now": None,        # Boolean for current availability
+        "near": None,            # Location string
+        "sort": None,            # relevance, rating, distance
+    }
+    
+    # Extract query terms (food items, cuisine types, restaurant names, taste descriptors)
+    query_patterns = [
+        r'\b(?:pizza|burger|sushi|tacos?|pasta|chinese|italian|mexican|indian|thai|japanese|korean|vietnamese|american|french|mediterranean|bbq|seafood|steakhouse|cafe|coffee|breakfast|brunch|lunch|dinner)\b',
+        r'\b(?:spicy|mild|hot|sweet|savory|tangy|crispy|fried|grilled|baked|roasted)\b',  # Taste/cooking descriptors
+        r'\b(?:mcdonalds?|subway|starbucks|kfc|pizza\s*hut|dominos|chipotle|taco\s*bell)\b',
+        r'\b(?:restaurant|place|spot|joint|bar|grill|bistro|diner|kitchen)\b'
     ]
     
-    # Extract any food-related terms
-    for word_phrase in words:
-        if any(indicator in word_phrase for indicator in food_indicators):
-            extracted_keywords["food_keywords"].append(word_phrase)
-    
-    # Cuisine/dish extraction - look for proper nouns and food terms
-    cuisine_patterns = [
-        r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b',  # Proper nouns (restaurant names, cuisines)
-        r'\b\w*(?:curry|pasta|pizza|sushi|taco|burger|noodle|rice|bread|soup)\w*\b',
-        r'\b\w*(?:spicy|sweet|sour|salty|bitter|savory|mild|hot|cold)\b'
-    ]
-    
-    for pattern in cuisine_patterns:
-        matches = re.findall(pattern, text)
-        for match in matches:
-            if len(match.strip()) > 2:  # Avoid single letters
-                extracted_keywords["cuisine_keywords"].append(match.lower())
-    
-    # Price extraction - look for any price-related terms
-    price_patterns = [
-        r'\$\d+',  # Dollar amounts
-        r'\b\d+\s*(?:dollar|buck|rupee|pound|euro)\b',
-        r'\b(?:budget|cheap|expensive|costly|affordable|pricey|deal|discount|sale)\b',
-        r'\bunder\s*\d+\b', r'\bover\s*\d+\b', r'\babove\s*\d+\b', r'\bbelow\s*\d+\b'
-    ]
-    
-    for pattern in price_patterns:
+    query_matches = []
+    for pattern in query_patterns:
         matches = re.findall(pattern, text_lower)
-        extracted_keywords["price_keywords"].extend(matches)
+        query_matches.extend(matches)
     
-    # Taste descriptors - any adjectives that could describe food
-    taste_pattern = r'\b(?:spicy|mild|hot|sweet|sour|bitter|salty|savory|tangy|rich|light|heavy|fresh|crispy|crunchy|soft|tender|juicy|dry|wet|smooth|rough|creamy|chunky)\b'
-    taste_matches = re.findall(taste_pattern, text_lower)
-    extracted_keywords["taste_keywords"].extend(taste_matches)
+    # Clean and prioritize query matches
+    if query_matches:
+        # Remove generic terms and prioritize specific ones
+        specific_queries = [q for q in query_matches if q not in ['restaurant', 'place', 'spot', 'joint', 'bar']]
+        foursquare_params["query"] = specific_queries[0] if specific_queries else query_matches[0]
     
-    # Atmosphere/ambiance terms
-    atmosphere_pattern = r'\b(?:casual|formal|fancy|upscale|cozy|romantic|family|quiet|loud|busy|calm|outdoor|indoor|rooftop|waterfront|downtown|suburban)\b'
-    atmosphere_matches = re.findall(atmosphere_pattern, text_lower)
-    extracted_keywords["atmosphere_keywords"].extend(atmosphere_matches)
+    # Extract Foursquare category mappings
+    category_mapping = {
+        # Main restaurant categories
+        "restaurant": "13065",
+        "fast food": "13145", 
+        "cafe": "13032",
+        "bar": "13003",
+        
+        # Cuisine-specific categories  
+        "italian": "13236",
+        "chinese": "13099", 
+        "mexican": "13303",
+        "indian": "13199",
+        "japanese": "13263",
+        "thai": "13352",
+        "american": "13064",
+        "french": "13148",
+        "mediterranean": "13305",
+        "korean": "13276",
+        "vietnamese": "13360",
+        "seafood": "13338",
+        
+        # Specific food types
+        "pizza": "13064",
+        "burger": "13064",
+        "sushi": "13338",
+        "bbq": "13061",
+        "steakhouse": "13345",
+        "breakfast": "13065",
+        "coffee": "13032"
+    }
     
-    # Dietary terms
-    dietary_pattern = r'\b(?:vegetarian|vegan|gluten.free|halal|kosher|keto|paleo|organic|healthy|diet|low.fat|low.carb|sugar.free|dairy.free)\b'
-    dietary_matches = re.findall(dietary_pattern, text_lower)
-    extracted_keywords["dietary_keywords"].extend(dietary_matches)
+    # Map detected cuisines/food types to category IDs
+    detected_categories = []
+    for cuisine_term in query_matches:
+        if cuisine_term in category_mapping:
+            detected_categories.append(category_mapping[cuisine_term])
     
-    # Location terms
-    location_pattern = r'\b(?:near|close|nearby|walking|driving|far|distance|delivery|takeout|pickup|dine.in)\b'
-    location_matches = re.findall(location_pattern, text_lower)
-    extracted_keywords["location_keywords"].extend(location_matches)
+    foursquare_params["fsq_category_ids"] = list(set(detected_categories))  # Remove duplicates
     
-    # Time-related terms
-    time_pattern = r'\b(?:now|soon|later|tonight|today|tomorrow|weekend|morning|afternoon|evening|quick|fast|slow|rush|time|hour|minute)\b'
-    time_matches = re.findall(time_pattern, text_lower)
-    extracted_keywords["time_keywords"].extend(time_matches)
+    # Extract price preferences
+    price_patterns = {
+        "cheap": (1, 2), "budget": (1, 2), "affordable": (1, 2),
+        "expensive": (3, 4), "pricey": (3, 4), "upscale": (3, 4), "fine dining": (4, 4),
+        "mid-range": (2, 3), "moderate": (2, 3)
+    }
     
-    # Quality descriptors
-    quality_pattern = r'\b(?:good|great|excellent|amazing|awesome|terrible|bad|awful|best|worst|favorite|recommended|popular|famous|new|old)\b'
-    quality_matches = re.findall(quality_pattern, text_lower)
-    extracted_keywords["quality_keywords"].extend(quality_matches)
+    for price_term, (min_p, max_p) in price_patterns.items():
+        if price_term in text_lower:
+            foursquare_params["min_price"] = min_p
+            foursquare_params["max_price"] = max_p
+            break
     
-    # Service terms
-    service_pattern = r'\b(?:service|staff|waiter|waitress|server|friendly|rude|fast|slow|attentive|helpful)\b'
-    service_matches = re.findall(service_pattern, text_lower)
-    extracted_keywords["service_keywords"].extend(service_matches)
+    # Extract specific dollar amounts and budget numbers
+    dollar_matches = re.findall(r'\$(\d+)', text)
+    budget_matches = re.findall(r'\b(?:budget|spend|under|around|about)\s+(?:of\s+)?(\d+)', text_lower)
+    number_matches = re.findall(r'\b(\d{2,4})\b', text)  # 2-4 digit numbers (likely prices)
     
-    # Clean up and deduplicate
-    for key in extracted_keywords:
-        extracted_keywords[key] = list(set([kw.strip() for kw in extracted_keywords[key] if len(kw.strip()) > 2]))
+    amount = None
+    if dollar_matches:
+        amount = int(dollar_matches[0])
+    elif budget_matches:
+        amount = int(budget_matches[0])
+    elif number_matches:
+        # Only use if it looks like a reasonable price (50-5000)
+        potential_amounts = [int(n) for n in number_matches if 50 <= int(n) <= 5000]
+        if potential_amounts:
+            amount = potential_amounts[0]
     
-    # Add relevance score based on keyword density
-    total_keywords = sum(len(keywords) for keywords in extracted_keywords.values())
+    if amount:
+        # Map amount to Foursquare price levels (1=$ 2=$$ 3=$$$ 4=$$$$)
+        if amount <= 20:
+            foursquare_params["min_price"] = 1
+            foursquare_params["max_price"] = 1
+        elif amount <= 50:
+            foursquare_params["min_price"] = 1
+            foursquare_params["max_price"] = 2
+        elif amount <= 150:
+            foursquare_params["min_price"] = 2
+            foursquare_params["max_price"] = 3
+        elif amount <= 400:
+            foursquare_params["min_price"] = 3
+            foursquare_params["max_price"] = 4
+        else:
+            foursquare_params["min_price"] = 4
+            foursquare_params["max_price"] = 4
+    
+    # Extract timing preferences
+    timing_patterns = [
+        r'\b(?:open now|right now|currently open)\b',
+        r'\b(?:tonight|today|now)\b'
+    ]
+    
+    for pattern in timing_patterns:
+        if re.search(pattern, text_lower):
+            foursquare_params["open_now"] = True
+            break
+    
+    # Extract location mentions
+    location_patterns = [
+        r'\bnear\s+([A-Za-z\s]+)',
+        r'\bin\s+([A-Za-z\s,]+)',
+        r'\baround\s+([A-Za-z\s]+)',
+        r'\bclose to\s+([A-Za-z\s]+)'
+    ]
+    
+    for pattern in location_patterns:
+        match = re.search(pattern, text)
+        if match:
+            location = match.group(1).strip()
+            if len(location) > 3:  # Avoid short meaningless matches
+                foursquare_params["near"] = location
+                break
+    
+    # Extract sorting preferences
+    sort_patterns = {
+        "best rated": "rating",
+        "highest rated": "rating", 
+        "top rated": "rating",
+        "closest": "distance",
+        "nearby": "distance",
+        "nearest": "distance"
+    }
+    
+    for sort_term, sort_value in sort_patterns.items():
+        if sort_term in text_lower:
+            foursquare_params["sort"] = sort_value
+            break
+    
+    # Calculate relevance score based on extracted parameters
+    param_count = sum(1 for v in foursquare_params.values() if v is not None and v != [] and v != "")
     word_count = len(text.split())
-    relevance_score = min(1.0, total_keywords / max(1, word_count) * 5)  # Scale to 0-1
+    relevance_score = min(1.0, param_count / 4.0)  # Max score when 4+ params extracted
+    
+    # Clean up empty values
+    cleaned_params = {}
+    for key, value in foursquare_params.items():
+        if value is not None and value != [] and value != "":
+            cleaned_params[key] = value
     
     return {
-        "keywords": extracted_keywords,
+        "foursquare_params": cleaned_params,
         "relevance_score": relevance_score,
-        "total_keywords_found": total_keywords,
+        "parameters_extracted": param_count,
         "message_length": word_count,
-        "extraction_timestamp": datetime.utcnow().isoformat()
+        "extraction_timestamp": datetime.utcnow().isoformat(),
+        "raw_query_matches": query_matches
     }
 
 
@@ -251,7 +320,7 @@ class LangGraphAnalyzer:
         return state
     
     async def _extract_preferences(self, state: MessageAnalysisState) -> MessageAnalysisState:
-        extraction_result = preference_extractor.invoke(state["raw_message"])
+        extraction_result = foursquare_parameter_extractor.invoke(state["raw_message"])
         state["extracted_preferences"] = [extraction_result]
         state["next_action"] = "sentiment_analysis"
         return state
@@ -284,19 +353,31 @@ class LangGraphAnalyzer:
     
     async def _score_confidence(self, state: MessageAnalysisState) -> MessageAnalysisState:
         extraction_result = state["extracted_preferences"][0] if state["extracted_preferences"] else {}
-        keywords = extraction_result.get("keywords", {})
+        foursquare_params = extraction_result.get("foursquare_params", {})
         base_relevance = extraction_result.get("relevance_score", 0.0)
         
         relevance_factors = [base_relevance]
         
-        non_empty_categories = sum(1 for kw in keywords.values() if kw)
-        if non_empty_categories > 0:
-            relevance_factors.append(min(1.0, non_empty_categories / 6.0))
+        # Score based on Foursquare parameters extracted
+        param_count = extraction_result.get("parameters_extracted", 0)
+        if param_count > 0:
+            relevance_factors.append(min(1.0, param_count / 4.0))  # Max when 4+ params
         
-        if keywords.get("food_keywords") or keywords.get("cuisine_keywords"):
+        # Higher confidence for specific query terms
+        if foursquare_params.get("query"):
+            relevance_factors.append(0.9)
+        
+        # Higher confidence for category matches
+        if foursquare_params.get("fsq_category_ids"):
             relevance_factors.append(0.8)
-        if keywords.get("taste_keywords") or keywords.get("price_keywords"):
+        
+        # Price and location preferences add confidence
+        if foursquare_params.get("min_price") or foursquare_params.get("max_price"):
             relevance_factors.append(0.7)
+        if foursquare_params.get("near"):
+            relevance_factors.append(0.6)
+        
+        # Restaurant mentions still valuable
         if state["restaurant_mentions"]:
             relevance_factors.append(0.9)
         
@@ -304,7 +385,8 @@ class LangGraphAnalyzer:
         
         state["confidence_scores"] = {
             "overall_relevance": overall_relevance,
-            "keyword_density": min(1.0, extraction_result.get("total_keywords_found", 0) / 15.0)
+            "parameter_density": min(1.0, param_count / 5.0),  # Based on parameter extraction
+            "foursquare_compatibility": 1.0 if param_count > 0 else 0.0
         }
         state["next_action"] = "final_synthesis"
         return state
@@ -313,7 +395,7 @@ class LangGraphAnalyzer:
         """Synthesize all analysis results into final output."""
         
         extraction_result = state["extracted_preferences"][0] if state["extracted_preferences"] else {}
-        keywords = extraction_result.get("keywords", {})
+        foursquare_params = extraction_result.get("foursquare_params", {})
         
         # Create comprehensive analysis result
         final_result = {
@@ -322,13 +404,14 @@ class LangGraphAnalyzer:
             "group_id": state["user_context"].get("group_id"),
             "timestamp": datetime.utcnow().isoformat(),
             
-            # Core analysis - NEW generic keyword structure
-            "extracted_keywords": keywords,
-            "keyword_extraction_metadata": {
+            # Core analysis - NEW Foursquare-specific structure
+            "foursquare_parameters": foursquare_params,
+            "parameter_extraction_metadata": {
                 "relevance_score": extraction_result.get("relevance_score", 0.0),
-                "total_keywords_found": extraction_result.get("total_keywords_found", 0),
+                "parameters_extracted": extraction_result.get("parameters_extracted", 0),
                 "message_length": extraction_result.get("message_length", 0),
-                "extraction_timestamp": extraction_result.get("extraction_timestamp")
+                "extraction_timestamp": extraction_result.get("extraction_timestamp"),
+                "raw_query_matches": extraction_result.get("raw_query_matches", [])
             },
             "sentiment": state["sentiment_analysis"],
             "restaurant_mentions": state["restaurant_mentions"],
@@ -339,15 +422,16 @@ class LangGraphAnalyzer:
             "overall_relevance": state["confidence_scores"]["overall_relevance"],
             
             # Actionable insights
-            "should_update_preferences": state["confidence_scores"]["overall_relevance"] > 0.5,  # Lower threshold for generic approach
+            "should_update_preferences": state["confidence_scores"]["overall_relevance"] > 0.4,  # Lower threshold for API parameters
             "requires_follow_up": state["sentiment_analysis"].get("enthusiasm_level") == "high",
             "consensus_indicator": state["group_dynamics"]["consensus_building"],
+            "api_ready": state["confidence_scores"]["foursquare_compatibility"] > 0.0,
             
-            # Recommendation keywords - flatten all relevant keywords for API calls
-            "recommendation_keywords": self._flatten_keywords_for_recommendations(keywords),
+            # Direct API parameters for recommendations
+            "api_parameters": foursquare_params,
             
             # Metadata
-            "analysis_version": "langgraph_generic_v2.0",
+            "analysis_version": "langgraph_foursquare_v3.0",
             "processing_time": datetime.utcnow().isoformat()
         }
         
@@ -355,38 +439,6 @@ class LangGraphAnalyzer:
         
         return state
     
-    def _flatten_keywords_for_recommendations(self, keywords: Dict[str, List[str]]) -> List[str]:
-        """Flatten and prioritize keywords for restaurant recommendations."""
-        flattened = []
-        
-        # Prioritize keywords by relevance for restaurant search
-        priority_order = [
-            "cuisine_keywords",    # Most important for restaurant search
-            "food_keywords",       # General food terms
-            "taste_keywords",      # Flavor preferences
-            "dietary_keywords",    # Dietary restrictions
-            "price_keywords",      # Price considerations
-            "atmosphere_keywords", # Ambiance preferences
-            "quality_keywords",    # Quality indicators
-            "location_keywords",   # Location preferences
-            "time_keywords",       # Timing preferences
-            "service_keywords",    # Service expectations
-        ]
-        
-        for category in priority_order:
-            if category in keywords and keywords[category]:
-                flattened.extend(keywords[category])
-        
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_keywords = []
-        for keyword in flattened:
-            if keyword.lower() not in seen:
-                seen.add(keyword.lower())
-                unique_keywords.append(keyword)
-        
-        # Limit to top 20 keywords for API efficiency
-        return unique_keywords[:20]
     
     async def analyze_message(
         self, 

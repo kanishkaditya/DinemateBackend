@@ -54,7 +54,7 @@ async def get_group_recommendations(
 ):
     """Get restaurant recommendations based on current location and group preferences."""
     try:
-        results = await restaurant_service.get_location_based_group_recommendations(
+        results = await restaurant_service.get_group_recommendations(
             group_id=group_id,
             latitude=latitude,
             longitude=longitude,
